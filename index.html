@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+  <style type="text/css">
+    p, body, td, input, select, button { font-family: -apple-system,system-ui,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size: 14px; }
+    body { padding: 0px; margin: 0px; background-color: #ffffff; }
+    a { color: #1155a3; }
+    .space { margin: 10px 0px 10px 0px; }
+    .header { background: #003267; background: linear-gradient(to right, #011329 0%,#00639e 44%,#011329 100%); padding:20px 10px; color: white; box-shadow: 0px 0px 10px 5px rgba(0,0,0,0.75); }
+    .header a { color: white; }
+    .header h1 a { text-decoration: none; }
+    .header h1 { padding: 0px; margin: 0px; }
+    .main { padding: 10px; margin-top: 20px; }
+    .generated { color: #999; }
+    .generated a { color: #999; }
+  </style>
+
+  <style type="text/css">
+    .draggable {
+      border: 1px solid gray;
+      background-color: white;
+      display: inline-block;
+      width: 50px;
+      cursor: move;
+
+      padding: 15px 5px;
+      text-align: center;
+    }
+    .dragging-over {
+      outline: 2px solid red;
+    }
+  </style>
+
+  <!-- DayPilot library -->
+  <script src="js/daypilot/daypilot-all.min.js"></script>
+</head>
+<body>
+
+<div class="main" style="display:flex;">
+
+  <div style="width:200px; flex: 1;">
+    <div style="margin-bottom: 10px;">Assign Call Sign and Resources:</div>
+
+    <div class="draggable" data-id="1" data-name="CallSign: KL101">KL101</div>
+    <div class="draggable" data-id="2" data-name="Officer: KPL. ERMAN">KPL. ERMAN</div>
+    <div class="draggable" data-id="2" data-name="Officer: SGN. HUSNUL">KPL. ERMAN</div>
+  </div>
+
+  <div style="flex: 4;">
+    <div id="dp"></div>
+    
+  </div>
+
+</div>
+
+
+
+<script>
+  var dp = new DayPilot.Scheduler("dp", {
+    cellWidthSpec: "Fixed",
+    cellWidth: 30,
+    crosshairType: "Full",
+    timeHeaders: [{"groupBy":"Day","format":"dddd, d MMMM yyyy"},{"groupBy":"Hour"},{"groupBy":"Cell","format":"mm"}],
+    scale: "CellDuration",
+    cellDuration: 30,
+    days: 1,
+    startDate: DayPilot.Date.today(),
+    businessWeekends: true,
+    eventMovingStartEndEnabled: true,
+    eventResizingStartEndEnabled: true,
+    timeRangeSelectingStartEndEnabled: true,
+    groupConcurrentEvents: true,
+    timeRangeSelectedHandling: "Enabled",
+    onTimeRangeSelected: async (args) => {
+      const modal = await DayPilot.Modal;
+      dp.clearSelection();
+      if (modal.canceled) {
+        return;
+      }
+
+      dp.events.add({
+        start: args.start,
+        end: args.end,
+        id: DayPilot.guid(),
+        resource: args.resource,
+        text: modal.result
+      });
+
+    },
+    treeEnabled: true,
+    contextMenu: new DayPilot.Menu({
+      items: [
+        { text: "Delete", onClick: (args) => { const dp = args.source.calendar; dp.events.remove(args.source); } }
+      ]
+    }),
+  });
+  
+  dp.resources = [
+    {name: "Zon 1", id: "R1"},
+    {name: "Zon 2", id: "R2"},
+    {name: "Zon 3", id: "R3"},
+    {name: "Zon 4", id: "R4"},
+    {name: "Zon 5", id: "R5"},
+    {name: "Zon 6", id: "R6"},
+    {name: "Zon 7", id: "R7"},
+    {name: "Zon 8", id: "R8"},
+  ];
+
+  dp.events.list = [
+    {
+      id: 1,
+      start: "2021-04-02",
+      end: "2021-04-10",
+      resource: "R2",
+      text: "Event 1"
+    }
+  ];
+
+  dp.onAfterEventRender = (args) => {
+
+    args.div.addEventListener("dragover", (ev) => {
+      const hasMyType = ev.dataTransfer.types.some(function(type) { return type === "daypilot/external-item"; });
+      if (hasMyType) {
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = "move";
+      }
+      args.div.classList.add("dragging-over");
+    });
+
+    args.div.addEventListener("dragleave", (ev) => {
+      args.div.classList.remove("dragging-over");
+    });
+
+    args.div.addEventListener("drop", (ev) => {
+
+      if (!args.e.data.items) {
+        args.e.data.items = [];
+      }
+
+      const data = JSON.parse(ev.dataTransfer.getData("daypilot/external-item"));
+      args.e.data.items.push(data);
+
+      dp.events.update(args.e);
+    });
+  };
+
+  dp.onBeforeEventRender = (args) => {
+    if (args.data.items) {
+      args.data.html = args.data.items.map(function(item) { return item.name; }).join(", ");
+    }
+    else {
+      args.data.html = "(empty)";
+    }
+  };
+
+  dp.init();
+
+  activateItems();
+
+  function activateItems() {
+    const src = document.getElementsByClassName("draggable");
+
+    for (let item of src) {
+      item.setAttribute("draggable", "true");
+
+      item.addEventListener("dragstart", (ev) => {
+        const data = {
+          id: item.dataset.id,
+          name: item.dataset.name
+        };
+        ev.dataTransfer.setData("daypilot/external-item", JSON.stringify(data));
+      });
+
+      item.addEventListener("dragend", (ev) => {
+        if (ev.dataTransfer.dropEffect === "move") {
+          item.parentElement.removeChild(item);
+        }
+      });
+
+    }
+
+  }
+
+</script>
+
+</body>
+</html>
